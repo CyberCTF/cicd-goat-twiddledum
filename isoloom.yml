@@ -1,0 +1,102 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# Twiddledum (CI/CD Goat, CICD-SEC-3 Dependency Chain Abuse): a live, two-machine CI/CD lab.
+# A Jenkins controller runs a multibranch pipeline for Wonderland's twiddledum repository, hosted on
+# a Gitea server. twiddledum depends on Wonderland/twiddledee, pinned by a MUTABLE git-tag range
+# (package.json: git+http://gitea:3000/Wonderland/twiddledee#semver:^1.1.0). The flag is a string
+# credential in the Jenkins credential store (GLOBAL scope) that the pipeline binds into the build's
+# environment as FLAG6. An attacker with write access to the *dependency* (twiddledee) poisons its
+# index.js and pushes a higher tag (1.2.0); npm resolves the higher tag, the dependency's code runs
+# inside the twiddledum build and exfiltrates FLAG6. This is dependency chain abuse via a mutable
+# git ref. See https://www.isoloom.com.
+version: 1
+name: cicd-goat-twiddledum
+
+networks:
+  lab: { cidr: 10.44.0.0/24 }
+
+# The per-player flag, issued by CyberCTF and handed to the lab by the launcher as a FILE (never an
+# environment value, so it never shows in `docker inspect`, an image layer or a generated file). The
+# Jenkins entrypoint stages it into the directory JCasC reads file secrets from, so the flag6
+# credential resolves at boot. Optional: an offline start (local, CI) leaves it empty and the lab
+# stages its inert development placeholder instead, so the lab still comes up and is solvable.
+#   CTF_FLAG_TWIDDLEDUM  objective `twiddledum`  (SECRET: Wonderland's flag6 release token)
+inputs:
+  CTF_FLAG_TWIDDLEDUM:
+    description: the twiddledum flag, injected into the Jenkins credential store as flag6 (GLOBAL)
+
+machines:
+  # Wonderland's git host: Gitea, holding the PUBLIC Wonderland/twiddledum and Wonderland/twiddledee
+  # repositories. The setup job provisions the org and the attacker user (alice, write on the
+  # dependency twiddledee), then pushes both sample projects — twiddledee carrying its initial 1.1.0
+  # tag. No `publish` number: `publish: true` asks the runner for a free host port it picks at `up`
+  # time (dynamic), so two labs never collide.
+  gitea:
+    app:
+      build: build/gitea
+    networks: { lab: 12 }
+    resources: { cpus: 1, memory_mb: 1024 }
+    volumes: { data: /data }
+    ports:
+      web: { port: 3000, protocol: http, publish: true }
+    setup: [build/gitea/seed.sh]
+
+  # Wonderland's Jenkins controller: a git-backed multibranch pipeline for twiddledum, rescanned
+  # every minute (the SCM-poll trigger). The build binds flag6 (a GLOBAL-scope string credential)
+  # into FLAG6, runs `npm install --ignore-scripts` (so install scripts are inert — the upstream
+  # twist) and then `node index.js`, which requires the twiddledee dependency and so executes its
+  # code. The per-player flag arrives as a root-only file; only the entrypoint reads it. node + npm
+  # are installed so the build (and the in-machine solver) can resolve the git dependency.
+  jenkins:
+    app:
+      build: build/jenkins
+    networks: { lab: 10 }
+    resources: { cpus: 2, memory_mb: 2048 }
+    ports:
+      web: { port: 8080, protocol: http, publish: true }
+    files:
+      - { path: /run/lab/secrets/flag6, input: CTF_FLAG_TWIDDLEDUM }
+
+# From the player's side, on every target: reachability checks that both services answer, and the
+# intended path as a solver that runs inside the Jenkins controller — it performs dependency chain
+# abuse end to end (clone twiddledee with the attacker's write creds, poison index.js, push a higher
+# git tag, trigger the twiddledum build) and proves the GLOBAL-scope flag was exfiltrated through the
+# poisoned dependency, without ever printing it. Jenkins is slow to boot and each build resolves and
+# clones a git dependency, so the waits are generous.
+checks:
+  - name: the Gitea git host answers
+    http: http://gitea:3000/
+    wait: 3m
+  - name: the Jenkins controller answers
+    http: http://jenkins:8080/login
+    wait: 5m
+  - name: the flag6 credential is exfiltrated via a poisoned git-tag dependency
+    from: jenkins
+    exec: bash /usr/local/bin/tw-solve
+    wait: 7m
+
+# Shown when the lab is up.
+message: |
+  Wonderland runs CI on **Jenkins**, building the **Wonderland/twiddledum** repository hosted on
+  **Gitea**. `twiddledum` is a small Node app that depends on **Wonderland/twiddledee**, pinned in
+  its `package.json` by a **git-tag version range** (`#semver:^1.1.0`) — a *mutable* reference.
+
+  - Gitea:   {{ machines.gitea.ports.web.url }}   (sign in as `alice` / `alice`)
+  - Jenkins: {{ machines.jenkins.ports.web.url }} (sign in as `admin` / `admin` to read build consoles)
+
+  You have **write** access to the *dependency*, `Wonderland/twiddledee`. The twiddledum pipeline
+  binds Wonderland's release token into the build and runs `npm install --ignore-scripts` (so npm
+  lifecycle scripts are a dead end) followed by `node index.js`, which `require()`s twiddledee.
+
+  ```
+  git clone {{ machines.gitea.ports.web.url }}Wonderland/twiddledee.git
+  ```
+
+  Poison twiddledee's `index.js` to read the pipeline's `FLAG6` and print it in a form the console
+  will not mask (Jenkins masks the raw value *and* its plain base64 — reverse it first), then push a
+  **higher tag** so the range resolves to your commit:
+
+  ```
+  git tag 1.2.0 HEAD && git push origin 1.2.0
+  ```
+
+  Trigger the twiddledum pipeline and read the build's console output in Jenkins.

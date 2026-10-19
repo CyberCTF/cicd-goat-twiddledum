@@ -1,0 +1,42 @@
+# Jenkins Configuration-as-Code for Wonderland's controller.
+#
+# The flag6 credential is a GLOBAL-scope string credential — Wonderland's release token, which the
+# twiddledum pipeline binds into its build environment. Its value is NOT in this file and NOT in the
+# image; it is resolved at boot from a file secret (`${flag6}` -> $SECRETS/flag6), which the
+# entrypoint stages from the per-player input Isoloom mounts at run time. The vulnerability
+# (CICD-SEC-3) is not here but in twiddledum's dependency pinning: a mutable git-tag range over a
+# repository the attacker can write to.
+jenkins:
+  systemMessage: "Wonderland CI — builds twiddledum, which depends on twiddledee."
+  numExecutors: 1
+  mode: NORMAL
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "admin"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+security:
+  globalJobDslSecurityConfiguration:
+    useScriptSecurity: false
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - string:
+              id: "flag6"
+              scope: GLOBAL
+              secret: "${flag6}"
+              description: "Wonderland release token — keep secret"
+
+unclassified:
+  location:
+    url: "http://jenkins:8080/"
+
+jobs:
+  - file: /usr/share/jenkins/casc/jobdsl/twiddledum.groovy

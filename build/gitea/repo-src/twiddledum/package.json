@@ -1,0 +1,15 @@
+{
+  "name": "twiddledum",
+  "version": "1.0.0",
+  "description": "Wonderland's twiddle front-end; pairs with the twiddledee helper.",
+  "main": "index.js",
+  "license": "ISC",
+  "author": "Wonderland Engineering <eng@wonderland.example>",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"no tests\" && exit 0"
+  },
+  "dependencies": {
+    "twiddledee": "git+http://gitea:3000/Wonderland/twiddledee#semver:^1.1.0"
+  }
+}

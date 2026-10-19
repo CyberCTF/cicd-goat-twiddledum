@@ -1,0 +1,19 @@
+{
+  "objectives": [
+    {
+      "key": "twiddledum",
+      "title": "Twiddledum",
+      "prompt": "Wonderland runs CI on Jenkins, building the Wonderland/twiddledum repository (hosted on Gitea). twiddledum is a small Node app that depends on Wonderland/twiddledee, pinned in its package.json by a git-tag version range (#semver:^1.1.0) — a mutable reference. The twiddledum pipeline binds Wonderland's release token into the build as FLAG6, runs `npm install --ignore-scripts` and then `node index.js`, which require()s twiddledee. You have write access to the dependency, Wonderland/twiddledee. Poison its index.js to read FLAG6 and print it in a form the console will not mask, push a higher tag (e.g. 1.2.0) so the range resolves to your commit, trigger the twiddledum pipeline, then read the build's console output, recover the value, and submit the flag.",
+      "check": { "evidence": "SECRET", "format": "%s" },
+      "dev": "tw-dev-flag-not-a-real-secret-0000",
+      "capabilities": [
+        "dependency-chain-git-tag"
+      ],
+      "hints": [
+        "Read twiddledum's package.json: the twiddledee dependency is pinned to `#semver:^1.1.0`, a git-tag RANGE. npm resolves it by listing twiddledee's tags and picking the highest match — so a new, higher tag you push becomes the version the pipeline installs.",
+        "Install scripts are a dead end: the pipeline runs `npm install --ignore-scripts`, so preinstall/postinstall never run. But twiddledum does `node index.js`, which `require()`s twiddledee — the dependency's module code runs regardless. Put your payload in twiddledee's index.js.",
+        "The pipeline binds the token into the environment as FLAG6. Jenkins masks a bound secret's value in the console — and, on modern versions, its plain base64 too. Transform it so the masker misses it: reverse before encoding, e.g. Buffer.from(process.env.FLAG6.split('').reverse().join('')).toString('base64'), then undo that to recover the flag."
+      ]
+    }
+  ]
+}

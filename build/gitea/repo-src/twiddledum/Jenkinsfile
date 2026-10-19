@@ -1,0 +1,38 @@
+// twiddledum CI pipeline (declarative). Installs dependencies and runs the app.
+//
+// Wonderland's release token is bound into the build as FLAG6 (a GLOBAL-scope Jenkins credential),
+// because a later release step uses it. Dependencies are installed with `--ignore-scripts`, so npm
+// lifecycle scripts (pre/postinstall) never run — a deliberate guardrail. The app is then started
+// with `node index.js`, which `require()`s the twiddledee dependency and therefore executes the
+// dependency's own module code. twiddledee is pinned by a mutable git-tag range in package.json.
+pipeline {
+    agent any
+
+    environment {
+        PACKAGE = 'twiddledum'
+    }
+
+    stages {
+        stage('Install_Requirements') {
+            steps {
+                withCredentials([string(credentialsId: 'flag6', variable: 'FLAG6')]) {
+                    sh '''
+                        set -e
+                        # Start clean so the dependency range is always re-resolved against the
+                        # current tags (no stale node_modules / lockfile pinning an old version).
+                        rm -rf node_modules package-lock.json
+                        npm install --ignore-scripts --no-audit --no-fund --prefer-online \
+                            --cache "${WORKSPACE}/.npmcache"
+                        node index.js
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

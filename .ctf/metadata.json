@@ -1,0 +1,13 @@
+{
+  "project_name": "cyberlabs-cicd-goat-twiddledum",
+  "slug": "cicd-goat-twiddledum",
+  "title": "Twiddledum: dependency chain abuse",
+  "description": "A Jenkins controller builds Wonderland's twiddledum repository (hosted on Gitea). twiddledum depends on Wonderland/twiddledee, pinned by a mutable git-tag version range (#semver:^1.1.0). An attacker with write access to the dependency poisons its index.js and pushes a higher tag; npm resolves the higher tag, so the dependency's code executes inside the twiddledum build and exfiltrates a release token the pipeline binds from the Jenkins credential store (OWASP CICD-SEC-3, Dependency Chain Abuse). Reproduces the \"Twiddledum\" challenge from CI/CD Goat.",
+  "category": "cicd",
+  "difficulty": 3,
+  "evidence_kind": "SECRET",
+  "capabilities": [
+    "dependency-chain-git-tag"
+  ],
+  "question": "Abuse the mutable git-tag dependency of the Wonderland/twiddledum pipeline to execute code through the Wonderland/twiddledee dependency and exfiltrate the flag6 release token from the Jenkins credential store."
+}
