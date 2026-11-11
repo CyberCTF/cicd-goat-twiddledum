@@ -4,7 +4,8 @@
 # Isoloom mounts at run time. Runs as root so the entrypoint can read that root-only mounted secret;
 # builds execute on the controller's own executor (`agent any`), which has node + npm so the
 # pipeline (and the in-controller solver) can resolve the twiddledee git dependency.
-FROM jenkins/jenkins:lts-jdk21
+# jenkins/jenkins:lts-jdk21, pinned to its multi-arch digest as resolved on 2026-11-11.
+FROM jenkins/jenkins:lts-jdk21@sha256:74401de6a6f92e1afe1b02d1c8e3d0c33f263bfb5275dd8813f9150355f2367b
 
 USER root
 
